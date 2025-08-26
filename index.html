@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BackWerk - Employee Time Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 15px;
+        }
+
+        .container {
+            max-width: 420px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            text-align: center;
+            padding: 25px 20px;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><defs><linearGradient id="grain"><stop offset="0%" stop-color="white" stop-opacity="0.1"/><stop offset="100%" stop-color="white" stop-opacity="0.05"/></linearGradient></defs><rect width="100" height="20" fill="url(%23grain)"/></svg>');
+        }
+
+        .shop-name {
+            font-size: 28px;
+            font-weight: 800;
+            margin-bottom: 5px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 1;
+        }
+
+        .shop-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+            font-weight: 300;
+            position: relative;
+            z-index: 1;
+        }
+
+        .content {
+            padding: 30px 25px;
+        }
+
+        .employee-select {
+            margin-bottom: 25px;
+        }
+
+        .employee-select label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .employee-select select {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            font-size: 16px;
+            background: white;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .employee-select select:focus {
+            outline: none;
+            border-color: #ff6b6b;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 107, 0.3);
+        }
+
+        .time-input-section {
+            background: #f8f9fb;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 2px solid #e8ecef;
+        }
+
+        .current-time {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .current-time .time {
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .current-time .date {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .time-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .time-input-group {
+            text-align: center;
+        }
+
+        .time-input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .time-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            text-align: center;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .time-input:focus {
+            outline: none;
+            border-color: #ff6b6b;
+            box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+        }
+
+        .quick-time-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-top: 5px;
+            transition: all 0.2s ease;
+        }
+
+        .quick-time-btn:hover {
+            background: #ee5a24;
+            transform: translateY(-1px);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 25px;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(58, 123, 213, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status-message {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .records-section {
+            margin-top: 30px;
+        }
+
+        .records-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .records-header h3 {
+            color: #333;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 10px 16px;
+            font-size: 13px;
+            border-radius: 8px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .btn-small:hover {
+            background: #ee5a24;
+            transform: translateY(-1px);
+        }
+
+        .record-item {
+            background: #f8f9fb;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #ff6b6b;
+            transition: all 0.3s ease;
+        }
+
+        .record-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .record-date {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 6px;
+            font-size: 16px;
+        }
+
+        .record-times {
+            font-size: 13px;
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .record-hours {
+            font-weight: 700;
+            color: #ff6b6b;
+            font-size: 18px;
+        }
+
+        .no-records {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 30px;
+            background: #f8f9fb;
+            border-radius: 12px;
+            border: 2px dashed #ddd;
+        }
+
+        .monthly-total {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            margin-top: 25px;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+        }
+
+        .monthly-total h3 {
+            margin-bottom: 12px;
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .monthly-total .total-hours {
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .clear-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .clear-btn:hover {
+            background: #c82333;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                margin: 5px;
+                border-radius: 15px;
+            }
+            
+            .content {
+                padding: 20px 15px;
+            }
+
+            .time-inputs {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .shop-name {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="shop-name">🏪 BACKWERK</div>
+            <div class="shop-subtitle">Employee Time Management System</div>
+        </div>
+        
+        <div class="content">
+            <div class="employee-select">
+                <label for="employee">👤 Select Employee:</label>
+                <select id="employee">
+                    <option value="">-- Choose Your Name --</option>
+                    <option value="Irfan">Irfan</option>
+                    <option value="Gizem">Gizem</option>
+                    <option value="Yan">Yan</option>
+                    <option value="Waqas">Waqas</option>
+                    <option value="Ayesha">Ayesha</option>
+                    <option value="Najat">Najat</option>
+                    <option value="Atta">Atta</option>
+                </select>
+            </div>
+
+            <div class="time-input-section">
+                <div class="current-time">
+                    <div class="time" id="currentTime">--:--:--</div>
+                    <div class="date" id="currentDate">-- -- ----</div>
+                </div>
+
+                <div class="time-inputs">
+                    <div class="time-input-group">
+                        <label for="startTime">🕐 Start Time</label>
+                        <input type="time" id="startTime" class="time-input" />
+                        <button class="quick-time-btn" onclick="setCurrentTime('startTime')">Now</button>
+                    </div>
+                    <div class="time-input-group">
+                        <label for="endTime">🕕 End Time</label>
+                        <input type="time" id="endTime" class="time-input" />
+                        <button class="quick-time-btn" onclick="setCurrentTime('endTime')">Now</button>
+                    </div>
+                </div>
+
+                <button class="submit-btn" id="submitBtn" onclick="submitTimeEntry()">
+                    ✅ Submit Work Hours
+                </button>
+            </div>
+
+            <div class="status-message" id="statusMessage"></div>
+
+            <div class="records-section">
+                <div class="records-header">
+                    <h3>📊 Work Records</h3>
+                    <div>
+                        <button class="btn-small" onclick="downloadReport()">📥 Export</button>
+                        <button class="clear-btn" onclick="clearRecords()">🗑️ Clear</button>
+                    </div>
+                </div>
+                <div id="recordsList">
+                    <div class="no-records">Select an employee to view work records</div>
+                </div>
+            </div>
+
+            <div class="monthly-total" id="monthlyTotal" style="display: none;">
+                <h3>📅 This Month Total</h3>
+                <div class="total-hours" id="totalHours">0.0 hours</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // In-memory storage (in production, you'd use a database)
+        let timeRecords = JSON.parse(localStorage.getItem('backwerkTimeRecords') || '[]');
+        let currentEmployee = '';
+
+        // Update current time
+        function updateCurrentTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('de-DE', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const dateStr = now.toLocaleDateString('de-DE', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            document.getElementById('currentTime').textContent = timeStr;
+            document.getElementById('currentDate').textContent = dateStr;
+        }
+
+        // Set current time to input field
+        function setCurrentTime(inputId) {
+            const now = new Date();
+            const timeStr = now.toTimeString().slice(0, 5);
+            document.getElementById(inputId).value = timeStr;
+        }
+
+        // Employee selection handler
+        document.getElementById('employee').addEventListener('change', function() {
+            currentEmployee = this.value;
+            if (currentEmployee) {
+                updateRecordsList();
+                updateMonthlyTotal();
+                document.getElementById('submitBtn').disabled = false;
+            } else {
+                resetView();
+                document.getElementById('submitBtn').disabled = true;
+            }
+        });
+
+        // Submit time entry
+        function submitTimeEntry() {
+            const startTime = document.getElementById('startTime').value;
+            const endTime = document.getElementById('endTime').value;
+
+            if (!currentEmployee) {
+                showMessage('Please select an employee first!', 'error');
+                return;
+            }
+
+            if (!startTime || !endTime) {
+                showMessage('Please enter both start and end times!', 'error');
+                return;
+            }
+
+            // Calculate hours worked
+            const start = new Date(`2000-01-01T${startTime}:00`);
+            let end = new Date(`2000-01-01T${endTime}:00`);
+            
+            // Handle overnight shifts
+            if (end <= start) {
+                end.setDate(end.getDate() + 1);
+            }
+            
+            const hoursWorked = (end - start) / (1000 * 60 * 60);
+            
+            if (hoursWorked <= 0 || hoursWorked > 24) {
+                showMessage('Invalid time range! Please check your times.', 'error');
+                return;
+            }
+
+            // Create record
+            const record = {
+                id: Date.now(),
+                employee: currentEmployee,
+                date: new Date().toDateString(),
+                startTime: startTime,
+                endTime: endTime,
+                hours: Math.round(hoursWorked * 100) / 100
+            };
+
+            // Add to records
+            timeRecords.push(record);
+            localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
+
+            // Show success message
+            showMessage(`✅ Work hours submitted successfully! Total: ${record.hours.toFixed(1)} hours`, 'success');
+
+            // Clear inputs
+            document.getElementById('startTime').value = '';
+            document.getElementById('endTime').value = '';
+
+            // Update displays
+            updateRecordsList();
+            updateMonthlyTotal();
+        }
+
+        // Show status message
+        function showMessage(message, type) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message ${type}`;
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        // Reset view
+        function resetView() {
+            document.getElementById('recordsList').innerHTML = '<div class="no-records">Select an employee to view work records</div>';
+            document.getElementById('monthlyTotal').style.display = 'none';
+            document.getElementById('statusMessage').style.display = 'none';
+        }
+
+        // Update records list
+        function updateRecordsList() {
+            const recordsList = document.getElementById('recordsList');
+            const employeeRecords = timeRecords
+                .filter(r => r.employee === currentEmployee)
+                .sort((a, b) => new Date(b.date) - new Date(a.date))
+                .slice(0, 15); // Show last 15 records
+            
+            if (employeeRecords.length === 0) {
+                recordsList.innerHTML = '<div class="no-records">No work records found for this employee.</div>';
+                return;
+            }
+            
+            recordsList.innerHTML = employeeRecords.map(record => {
+                const date = new Date(record.date).toLocaleDateString('de-DE', {
+                    weekday: 'short',
+                    day: '2-digit',
+                    month: '2-digit'
+                });
+                
+                return `
+                    <div class="record-item">
+                        <div>
+                            <div class="record-date">${date}</div>
+                            <div class="record-times">
+                                🕐 ${record.startTime} - 🕕 ${record.endTime}
+                            </div>
+                        </div>
+                        <div class="record-hours">${record.hours.toFixed(1)}h</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Update monthly total
+        function updateMonthlyTotal() {
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
+            
+            const monthlyRecords = timeRecords.filter(r => 
+                r.employee === currentEmployee &&
+                new Date(r.date).getMonth() === currentMonth &&
+                new Date(r.date).getFullYear() === currentYear
+            );
+            
+            const totalHours = monthlyRecords.reduce((sum, record) => sum + record.hours, 0);
+            
+            if (totalHours > 0) {
+                document.getElementById('monthlyTotal').style.display = 'block';
+                document.getElementById('totalHours').textContent = `${totalHours.toFixed(1)} hours`;
+            } else {
+                document.getElementById('monthlyTotal').style.display = 'none';
+            }
+        }
+
+        // Download report
+        function downloadReport() {
+            if (!currentEmployee) {
+                showMessage('Please select an employee first!', 'error');
+                return;
+            }
+            
+            const employeeRecords = timeRecords.filter(r => r.employee === currentEmployee);
+            
+            if (employeeRecords.length === 0) {
+                showMessage('No records found for this employee!', 'error');
+                return;
+            }
+            
+            // Create CSV content
+            let csvContent = "Date,Start Time,End Time,Hours Worked\n";
+            employeeRecords.forEach(record => {
+                const date = new Date(record.date).toLocaleDateString('de-DE');
+                csvContent += `${date},${record.startTime},${record.endTime},${record.hours}\n`;
+            });
+            
+            // Download file
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentEmployee}_BackWerk_timesheet.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            showMessage('📥 Report downloaded successfully!', 'success');
+        }
+
+        // Clear records
+        function clearRecords() {
+            if (!currentEmployee) {
+                showMessage('Please select an employee first!', 'error');
+                return;
+            }
+            
+            if (confirm(`Are you sure you want to clear all records for ${currentEmployee}?`)) {
+                timeRecords = timeRecords.filter(r => r.employee !== currentEmployee);
+                localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
+                updateRecordsList();
+                updateMonthlyTotal();
+                showMessage('🗑️ Records cleared successfully!', 'success');
+            }
+        }
+
+        // Initialize the app
+        updateCurrentTime();
+        setInterval(updateCurrentTime, 1000);
+        document.getElementById('submitBtn').disabled = true;
+
+        // Demo data (remove this in production)
+        if (timeRecords.length === 0) {
+            timeRecords = [
+                {
+                    id: 1,
+                    employee: 'Irfan',
+                    date: new Date(Date.now() - 86400000).toDateString(),
+                    startTime: '09:00',
+                    endTime: '17:00',
+                    hours: 8
+                },
+                {
+                    id: 2,
+                    employee: 'Gizem',
+                    date: new Date(Date.now() - 172800000).toDateString(),
+                    startTime: '10:00',
+                    endTime: '18:30',
+                    hours: 8.5
+                }
+            ];
+            localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
+        }
+    </script>
+</body>
+</html>
