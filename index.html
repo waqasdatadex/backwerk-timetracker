@@ -424,6 +424,7 @@
                     <h3>📊 Work Records</h3>
                     <div>
                         <button class="btn-small" onclick="downloadReport()">📥 Export</button>
+<button class="btn-small" onclick="openGoogleSheet()">📊 View Sheet</button>
                         <button class="clear-btn" onclick="clearRecords()">🗑️ Clear</button>
                     </div>
                 </div>
@@ -443,7 +444,7 @@
         // In-memory storage (in production, you'd use a database)
         let timeRecords = JSON.parse(submitTimeEntry().getItem('backwerkTimeRecords') || '[]');
         let currentEmployee = '';
-        const GOOGLE_SCRIPT_URL = 'YOUR_ACTUAL_URL_FROM_STEP_2';
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/home/projects/10hW8bHFKrsLjyGEdgMDQjH3EerA3TfMIXPC0OCUWK0ZV5a8t-KWcv_g-/edit';
 
         // Update current time
         function updateCurrentTime() {
@@ -487,12 +488,47 @@
         // Submit time entry
         function submitTimeEntry() {
             const startTime = document.getElementById('startTime').value;
-            const endTime = document.getElementById('endTime').value;
+    const endTime = document.getElementById('endTime').value;
 
-            if (!currentEmployee) {
-                showMessage('Please select an employee first!', 'error');
-                return;
-            }
+    if (!currentEmployee) {
+        showMessage('Please select an employee first!', 'error');
+        return;
+    }
+
+    if (!startTime || !endTime) {
+        showMessage('Please enter both start and end times!', 'error');
+        return;
+    }
+
+    // Calculate hours
+    const start = new Date(`2000-01-01T${startTime}:00`);
+    let end = new Date(`2000-01-01T${endTime}:00`);
+    if (end <= start) end.setDate(end.getDate() + 1);
+    const hoursWorked = (end - start) / (1000 * 60 * 60);
+    
+    if (hoursWorked <= 0 || hoursWorked > 24) {
+        showMessage('Invalid time range!', 'error');
+        return;
+    }
+
+    // Send to Google Sheet
+    const formData = new FormData();
+    formData.append('employee', currentEmployee);
+    formData.append('date', new Date().toLocaleDateString('en-CA'));
+    formData.append('startTime', startTime);
+    formData.append('endTime', endTime);
+    formData.append('hours', Math.round(hoursWorked * 100) / 100);
+
+    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: formData })
+    .then(() => {
+        showMessage('✅ Sent to Google Sheet!', 'success');
+        document.getElementById('startTime').value = '';
+        document.getElementById('endTime').value = '';
+    })
+    .catch(() => {
+        showMessage('⚠️ Error sending to Google Sheet', 'error');
+    });
+        }
 
             if (!startTime || !endTime) {
                 showMessage('Please enter both start and end times!', 'error');
@@ -664,7 +700,10 @@
                 showMessage('🗑️ Records cleared successfully!', 'success');
             }
         }
-
+// Open Google Sheet
+function openGoogleSheet() {
+    window.open(GOOGLE_SHEET_URL, 'https://script.google.com/home/projects/10hW8bHFKrsLjyGEdgMDQjH3EerA3TfMIXPC0OCUWK0ZV5a8t-KWcv_g-/edit);
+}
         // Initialize the app
         updateCurrentTime();
         setInterval(updateCurrentTime, 1000);
