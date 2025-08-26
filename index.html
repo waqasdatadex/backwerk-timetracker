@@ -441,8 +441,9 @@
 
     <script>
         // In-memory storage (in production, you'd use a database)
-        let timeRecords = JSON.parse(localStorage.getItem('backwerkTimeRecords') || '[]');
+        let timeRecords = JSON.parse(submitTimeEntry().getItem('backwerkTimeRecords') || '[]');
         let currentEmployee = '';
+        const GOOGLE_SCRIPT_URL = 'YOUR_ACTUAL_URL_FROM_STEP_2';
 
         // Update current time
         function updateCurrentTime() {
