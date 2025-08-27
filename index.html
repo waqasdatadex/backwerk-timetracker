@@ -258,6 +258,7 @@
             cursor: pointer;
             font-weight: 600;
             transition: all 0.2s ease;
+            margin-left: 5px;
         }
 
         .btn-small:hover {
@@ -424,7 +425,7 @@
                     <h3>📊 Work Records</h3>
                     <div>
                         <button class="btn-small" onclick="downloadReport()">📥 Export</button>
-<button class="btn-small" onclick="openGoogleSheet()">📊 View Sheet</button>
+                        <button class="btn-small" onclick="openGoogleSheet()">📊 View Sheet</button>
                         <button class="clear-btn" onclick="clearRecords()">🗑️ Clear</button>
                     </div>
                 </div>
@@ -441,10 +442,13 @@
     </div>
 
     <script>
-        // In-memory storage (in production, you'd use a database)
-        let timeRecords = JSON.parse(submitTimeEntry().getItem('backwerkTimeRecords') || '[]');
+        // IMPORTANT: Replace this with your actual Google Apps Script Web App URL
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+        const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit';
+        
+        // Local storage for backup (will also sync with Google Sheets)
+        let timeRecords = JSON.parse(localStorage.getItem('backwerkTimeRecords') || '[]');
         let currentEmployee = '';
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/home/projects/10hW8bHFKrsLjyGEdgMDQjH3EerA3TfMIXPC0OCUWK0ZV5a8t-KWcv_g-/edit';
 
         // Update current time
         function updateCurrentTime() {
@@ -485,50 +489,15 @@
             }
         });
 
-        // Submit time entry
+        // Submit time entry - FIXED VERSION
         function submitTimeEntry() {
             const startTime = document.getElementById('startTime').value;
-    const endTime = document.getElementById('endTime').value;
+            const endTime = document.getElementById('endTime').value;
 
-    if (!currentEmployee) {
-        showMessage('Please select an employee first!', 'error');
-        return;
-    }
-
-    if (!startTime || !endTime) {
-        showMessage('Please enter both start and end times!', 'error');
-        return;
-    }
-
-    // Calculate hours
-    const start = new Date(`2000-01-01T${startTime}:00`);
-    let end = new Date(`2000-01-01T${endTime}:00`);
-    if (end <= start) end.setDate(end.getDate() + 1);
-    const hoursWorked = (end - start) / (1000 * 60 * 60);
-    
-    if (hoursWorked <= 0 || hoursWorked > 24) {
-        showMessage('Invalid time range!', 'error');
-        return;
-    }
-
-    // Send to Google Sheet
-    const formData = new FormData();
-    formData.append('employee', currentEmployee);
-    formData.append('date', new Date().toLocaleDateString('en-CA'));
-    formData.append('startTime', startTime);
-    formData.append('endTime', endTime);
-    formData.append('hours', Math.round(hoursWorked * 100) / 100);
-
-    fetch(GOOGLE_SCRIPT_URL, { method: 'POST', body: formData })
-    .then(() => {
-        showMessage('✅ Sent to Google Sheet!', 'success');
-        document.getElementById('startTime').value = '';
-        document.getElementById('endTime').value = '';
-    })
-    .catch(() => {
-        showMessage('⚠️ Error sending to Google Sheet', 'error');
-    });
-        }
+            if (!currentEmployee) {
+                showMessage('Please select an employee first!', 'error');
+                return;
+            }
 
             if (!startTime || !endTime) {
                 showMessage('Please enter both start and end times!', 'error');
@@ -555,26 +524,65 @@
             const record = {
                 id: Date.now(),
                 employee: currentEmployee,
-                date: new Date().toDateString(),
+                date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format
                 startTime: startTime,
                 endTime: endTime,
                 hours: Math.round(hoursWorked * 100) / 100
             };
 
-            // Add to records
-            timeRecords.push(record);
-            localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
+            // Show loading
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').textContent = '⏳ Submitting...';
 
-            // Show success message
-            showMessage(`✅ Work hours submitted successfully! Total: ${record.hours.toFixed(1)} hours`, 'success');
+            // Send to Google Sheets
+            sendToGoogleSheets(record)
+                .then(() => {
+                    // Add to local storage as backup
+                    timeRecords.push(record);
+                    localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
 
-            // Clear inputs
-            document.getElementById('startTime').value = '';
-            document.getElementById('endTime').value = '';
+                    // Show success
+                    showMessage(`✅ Work hours submitted successfully! Total: ${record.hours.toFixed(1)} hours`, 'success');
+                    
+                    // Clear inputs
+                    document.getElementById('startTime').value = '';
+                    document.getElementById('endTime').value = '';
+                    
+                    // Update displays
+                    updateRecordsList();
+                    updateMonthlyTotal();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showMessage('❌ Failed to submit to Google Sheets. Please try again.', 'error');
+                })
+                .finally(() => {
+                    // Reset button
+                    document.getElementById('submitBtn').disabled = false;
+                    document.getElementById('submitBtn').textContent = '✅ Submit Work Hours';
+                });
+        }
 
-            // Update displays
-            updateRecordsList();
-            updateMonthlyTotal();
+        // Send data to Google Sheets
+        function sendToGoogleSheets(record) {
+            const formData = new FormData();
+            formData.append('employee', record.employee);
+            formData.append('date', record.date);
+            formData.append('startTime', record.startTime);
+            formData.append('endTime', record.endTime);
+            formData.append('hours', record.hours);
+            formData.append('timestamp', new Date().toISOString());
+
+            return fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            });
         }
 
         // Show status message
@@ -586,7 +594,7 @@
             if (type === 'success') {
                 setTimeout(() => {
                     statusEl.style.display = 'none';
-                }, 3000);
+                }, 5000);
             }
         }
 
@@ -685,51 +693,35 @@
             showMessage('📥 Report downloaded successfully!', 'success');
         }
 
-        // Clear records
+        // Clear local records
         function clearRecords() {
             if (!currentEmployee) {
                 showMessage('Please select an employee first!', 'error');
                 return;
             }
             
-            if (confirm(`Are you sure you want to clear all records for ${currentEmployee}?`)) {
+            if (confirm(`Are you sure you want to clear all LOCAL records for ${currentEmployee}? This will NOT affect Google Sheets data.`)) {
                 timeRecords = timeRecords.filter(r => r.employee !== currentEmployee);
                 localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
                 updateRecordsList();
                 updateMonthlyTotal();
-                showMessage('🗑️ Records cleared successfully!', 'success');
+                showMessage('🗑️ Local records cleared successfully!', 'success');
             }
         }
-// Open Google Sheet
-function openGoogleSheet() {
-    window.open(GOOGLE_SHEET_URL, 'https://script.google.com/home/projects/10hW8bHFKrsLjyGEdgMDQjH3EerA3TfMIXPC0OCUWK0ZV5a8t-KWcv_g-/edit);
-}
+
+        // Open Google Sheet
+        function openGoogleSheet() {
+            window.open(GOOGLE_SHEET_URL, '_blank');
+        }
+
         // Initialize the app
         updateCurrentTime();
         setInterval(updateCurrentTime, 1000);
         document.getElementById('submitBtn').disabled = true;
 
-        // Demo data (remove this in production)
-        if (timeRecords.length === 0) {
-            timeRecords = [
-                {
-                    id: 1,
-                    employee: 'Irfan',
-                    date: new Date(Date.now() - 86400000).toDateString(),
-                    startTime: '09:00',
-                    endTime: '17:00',
-                    hours: 8
-                },
-                {
-                    id: 2,
-                    employee: 'Gizem',
-                    date: new Date(Date.now() - 172800000).toDateString(),
-                    startTime: '10:00',
-                    endTime: '18:30',
-                    hours: 8.5
-                }
-            ];
-            localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
+        // Check if Google Script URL is configured
+        if (GOOGLE_SCRIPT_URL.includes('YOUR_DEPLOYMENT_ID')) {
+            showMessage('⚠️ Please configure your Google Apps Script URL in the code!', 'error');
         }
     </script>
 </body>
