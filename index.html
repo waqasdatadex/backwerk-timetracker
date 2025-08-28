@@ -396,29 +396,33 @@
             </div>
 
             <div class="time-input-section">
-                <div class="current-time">
-                    <div class="time" id="currentTime">--:--:--</div>
-                    <div class="date" id="currentDate">-- -- ----</div>
-                </div>
+    <div class="date-input-group">
+        <label for="dateInput">📅 Select Date</label>
+        <input type="date" id="dateInput" class="time-input" />
+    </div>
 
-                <div class="time-inputs">
-                    <div class="time-input-group">
-                        <label for="startTime">🕐 Start Time</label>
-                        <input type="time" id="startTime" class="time-input" />
-                        <button class="quick-time-btn" onclick="setCurrentTime('startTime')">Now</button>
-                    </div>
-                    <div class="time-input-group">
-                        <label for="endTime">🕕 End Time</label>
-                        <input type="time" id="endTime" class="time-input" />
-                        <button class="quick-time-btn" onclick="setCurrentTime('endTime')">Now</button>
-                    </div>
-                </div>
+    <div class="current-time">
+        <div class="time" id="currentTime">--:--:--</div>
+        <div class="date" id="currentDate">-- -- ----</div>
+    </div>
 
-                <button class="submit-btn" id="submitBtn" onclick="submitTimeEntry()">
-                    ✅ Submit Work Hours
-                </button>
-            </div>
+    <div class="time-inputs">
+        <div class="time-input-group">
+            <label for="startTime">🕐 Start Time</label>
+            <input type="time" id="startTime" class="time-input" />
+            <button class="quick-time-btn" onclick="setCurrentTime('startTime')">Now</button>
+        </div>
+        <div class="time-input-group">
+            <label for="endTime">🕕 End Time</label>
+            <input type="time" id="endTime" class="time-input" />
+            <button class="quick-time-btn" onclick="setCurrentTime('endTime')">Now</button>
+        </div>
+    </div>
 
+    <button class="submit-btn" id="submitBtn" onclick="submitTimeEntry()">
+        ✅ Submit Work Hours
+    </button>
+</div>
             <div class="status-message" id="statusMessage"></div>
 
             <div class="records-section">
@@ -491,78 +495,84 @@
         });
 
         // Submit time entry - FIXED VERSION
-        function submitTimeEntry() {
-            const startTime = document.getElementById('startTime').value;
-            const endTime = document.getElementById('endTime').value;
+function submitTimeEntry() {
+    const dateInput = document.getElementById('dateInput').value;
+    const startTime = document.getElementById('startTime').value;
+    const endTime = document.getElementById('endTime').value;
 
-            if (!currentEmployee) {
-                showMessage('Please select an employee first!', 'error');
-                return;
-            }
+    if (!currentEmployee) {
+        showMessage('Please select an employee first!', 'error');
+        return;
+    }
 
-            if (!startTime || !endTime) {
-                showMessage('Please enter both start and end times!', 'error');
-                return;
-            }
+    if (!dateInput) {
+        showMessage('Please select a date!', 'error');
+        return;
+    }
 
-            // Calculate hours worked
-            const start = new Date(`2000-01-01T${startTime}:00`);
-            let end = new Date(`2000-01-01T${endTime}:00`);
+    if (!startTime || !endTime) {
+        showMessage('Please enter both start and end times!', 'error');
+        return;
+    }
+
+    // Calculate hours worked
+    const start = new Date(`${dateInput}T${startTime}:00`);
+    let end = new Date(`${dateInput}T${endTime}:00`);
+    
+    // Handle overnight shifts
+    if (end <= start) {
+        end.setDate(end.getDate() + 1);
+    }
+    
+    const hoursWorked = (end - start) / (1000 * 60 * 60);
+    
+    if (hoursWorked <= 0 || hoursWorked > 24) {
+        showMessage('Invalid time range! Please check your times.', 'error');
+        return;
+    }
+
+    // Create record
+    const record = {
+        id: Date.now(),
+        employee: currentEmployee,
+        date: dateInput,
+        startTime: startTime,
+        endTime: endTime,
+        hours: Math.round(hoursWorked * 100) / 100
+    };
+
+    // Show loading
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitBtn').textContent = '⏳ Submitting...';
+
+    // Send to Google Sheets
+    sendToGoogleSheets(record)
+        .then(() => {
+            // Add to local storage as backup
+            timeRecords.push(record);
+            localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
+
+            // Show success
+            showMessage(`✅ Work hours submitted successfully! Total: ${record.hours.toFixed(1)} hours`, 'success');
             
-            // Handle overnight shifts
-            if (end <= start) {
-                end.setDate(end.getDate() + 1);
-            }
+            // Clear inputs, but not the date
+            document.getElementById('startTime').value = '';
+            document.getElementById('endTime').value = '';
             
-            const hoursWorked = (end - start) / (1000 * 60 * 60);
-            
-            if (hoursWorked <= 0 || hoursWorked > 24) {
-                showMessage('Invalid time range! Please check your times.', 'error');
-                return;
-            }
-
-            // Create record
-            const record = {
-                id: Date.now(),
-                employee: currentEmployee,
-                date: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format
-                startTime: startTime,
-                endTime: endTime,
-                hours: Math.round(hoursWorked * 100) / 100
-            };
-
-            // Show loading
-            document.getElementById('submitBtn').disabled = true;
-            document.getElementById('submitBtn').textContent = '⏳ Submitting...';
-
-            // Send to Google Sheets
-            sendToGoogleSheets(record)
-                .then(() => {
-                    // Add to local storage as backup
-                    timeRecords.push(record);
-                    localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
-
-                    // Show success
-                    showMessage(`✅ Work hours submitted successfully! Total: ${record.hours.toFixed(1)} hours`, 'success');
-                    
-                    // Clear inputs
-                    document.getElementById('startTime').value = '';
-                    document.getElementById('endTime').value = '';
-                    
-                    // Update displays
-                    updateRecordsList();
-                    updateMonthlyTotal();
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    showMessage('❌ Failed to submit to Google Sheets. Please try again.', 'error');
-                })
-                .finally(() => {
-                    // Reset button
-                    document.getElementById('submitBtn').disabled = false;
-                    document.getElementById('submitBtn').textContent = '✅ Submit Work Hours';
-                });
-        }
+            // Update displays
+            updateRecordsList();
+            updateMonthlyTotal();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showMessage('❌ Failed to submit to Google Sheets. Please try again.', 'error');
+        })
+        .finally(() => {
+            // Reset button
+            document.getElementById('submitBtn').disabled = false;
+            document.getElementById('submitBtn').textContent = '✅ Submit Work Hours';
+        });
+}
 
         // Send data to Google Sheets
         function sendToGoogleSheets(record) {
