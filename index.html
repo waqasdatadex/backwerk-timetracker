@@ -380,20 +380,12 @@
         </div>
         
         <div class="content">
-            <div class="employee-select">
-                <label for="employee">👤 Select Employee:</label>
-                <select id="employee">
-                    <option value="">-- Choose Your Name --</option>
-                    <option value="Irfan">Irfan</option>
-                    <option value="Gizem">Gizem</option>
-                    <option value="Yan">Yan</option>
-                    <option value="Waqas">Waqas</option>
-                    <option value="Ayesha">Ayesha</option>
-                    <option value="Najat">Najat</option>
-                    <option value="Atta">Atta</option>
-                    <option value="Melek">Melek</option>
-                </select>
-            </div>
+          <div class="employee-select">
+    <label for="employee">👤 Select Employee:</label>
+    <select id="employee">
+        <option value="">-- Loading... --</option>
+    </select>
+</div>
 
             <div class="time-input-section">
     <div class="date-input-group">
@@ -447,61 +439,152 @@
     </div>
 
     <script>
-        // IMPORTANT: Replace this with your actual Google Apps Script Web App URL
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyaFKINZladCWIMN8f9XXErd-_koG4NVlm650GTAiUDs3VzcjoM8T0G_0j_IsVsLuGc/exec';
-        const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1N_T7qbLxqbK-K9eAdbTDFrml-ro4GNjrM8eT2cD4wRE/edit?gid=1333566102#gid=1333566102';
+        // Enhanced frontend script with authentication
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyaFKINZladCWIMN8f9XXErd-_koG4NVlm650GTAiUDs3VzcjoM8T0G_0j_IsVsLuGc/exec';
+const GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1N_T7qbLxqbK-K9eAdbTDFrml-ro4GNjrM8eT2cD4wRE/edit?gid=1333566102#gid=1333566102';
+
+// Global variables
+let timeRecords = JSON.parse(localStorage.getItem('backwerkTimeRecords') || '[]');
+let currentUser = null;
+let isAdmin = false;
+let availableEmployees = [];
+
+// Initialize the app
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
+    updateCurrentTime();
+    setInterval(updateCurrentTime, 1000);
+    
+    // Set today's date as default
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateInput').value = today;
+});
+
+// Initialize app with user authentication
+async function initializeApp() {
+    try {
+        showMessage('🔐 Checking authorization...', 'info');
         
-        // Local storage for backup (will also sync with Google Sheets)
-        let timeRecords = JSON.parse(localStorage.getItem('backwerkTimeRecords') || '[]');
-        let currentEmployee = '';
-
-        // Update current time
-        function updateCurrentTime() {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('de-DE', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
-            const dateStr = now.toLocaleDateString('de-DE', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
-            
-            document.getElementById('currentTime').textContent = timeStr;
-            document.getElementById('currentDate').textContent = dateStr;
-        }
-
-        // Set current time to input field
-        function setCurrentTime(inputId) {
-            const now = new Date();
-            const timeStr = now.toTimeString().slice(0, 5);
-            document.getElementById(inputId).value = timeStr;
-        }
-
-        // Employee selection handler
-        document.getElementById('employee').addEventListener('change', function() {
-            currentEmployee = this.value;
-            if (currentEmployee) {
-                updateRecordsList();
-                updateMonthlyTotal();
-                document.getElementById('submitBtn').disabled = false;
-            } else {
-                resetView();
-                document.getElementById('submitBtn').disabled = true;
-            }
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'GET'
         });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            currentUser = result.userInfo;
+            isAdmin = currentUser.role === 'Admin';
+            availableEmployees = result.allEmployees || [currentUser.name];
+            
+            setupEmployeeDropdown();
+            showMessage(`✅ Welcome ${currentUser.name}! ${isAdmin ? '(Admin Access)' : ''}`, 'success');
+            
+            // Auto-select user's own name if not admin
+            if (!isAdmin) {
+                document.getElementById('employee').value = currentUser.name;
+                document.getElementById('employee').dispatchEvent(new Event('change'));
+            }
+            
+        } else if (result.status === 'unauthorized') {
+            showUnauthorizedMessage(result.userEmail);
+            return;
+        } else if (result.status === 'inactive') {
+            showInactiveMessage();
+            return;
+        } else {
+            throw new Error(result.message);
+        }
+        
+    } catch (error) {
+        console.error('Authentication error:', error);
+        showMessage('❌ Authentication failed. Please try refreshing the page.', 'error');
+    }
+}
 
-        // Submit time entry - FIXED VERSION
-function submitTimeEntry() {
+// Setup employee dropdown based on user role
+function setupEmployeeDropdown() {
+    const employeeSelect = document.getElementById('employee');
+    employeeSelect.innerHTML = '<option value="">-- Choose Name --</option>';
+    
+    if (isAdmin) {
+        // Admin sees all active employees
+        availableEmployees.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            employeeSelect.appendChild(option);
+        });
+        
+        // Add admin controls
+        addAdminControls();
+    } else {
+        // Regular users only see their own name
+        const option = document.createElement('option');
+        option.value = currentUser.name;
+        option.textContent = currentUser.name;
+        employeeSelect.appendChild(option);
+        
+        // Auto-select and disable for regular users
+        employeeSelect.value = currentUser.name;
+        employeeSelect.disabled = true;
+        
+        // Update the label to show it's locked
+        const label = document.querySelector('label[for="employee"]');
+        label.innerHTML = `🔒 Employee: ${currentUser.name}`;
+    }
+}
+
+// Add admin controls to the interface
+function addAdminControls() {
+    const employeeSection = document.querySelector('.employee-select');
+    
+    // Add admin mode toggle
+    const adminToggle = document.createElement('div');
+    adminToggle.innerHTML = `
+        <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 10px; border: 2px solid #ffc107;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="checkbox" id="adminMode" onchange="toggleAdminMode()" />
+                <span style="font-weight: 600; color: #856404;">👑 Admin Mode - Submit for Others</span>
+            </label>
+            <p style="margin: 8px 0 0 0; font-size: 12px; color: #856404;">
+                Check this box to submit time entries on behalf of other employees
+            </p>
+        </div>
+    `;
+    
+    employeeSection.appendChild(adminToggle);
+}
+
+// Toggle admin mode
+function toggleAdminMode() {
+    const adminMode = document.getElementById('adminMode').checked;
+    const employeeSelect = document.getElementById('employee');
+    const label = document.querySelector('label[for="employee"]');
+    
+    if (adminMode) {
+        label.innerHTML = '👑 Submit for Employee (Admin Mode):';
+        employeeSelect.disabled = false;
+        employeeSelect.value = '';
+    } else {
+        label.innerHTML = '👤 Select Employee:';
+        employeeSelect.value = currentUser.name;
+        employeeSelect.disabled = true;
+    }
+    
+    // Trigger change event
+    employeeSelect.dispatchEvent(new Event('change'));
+}
+
+// Enhanced submit function
+async function submitTimeEntry() {
     const dateInput = document.getElementById('dateInput').value;
+    const selectedEmployee = document.getElementById('employee').value;
     const startTime = document.getElementById('startTime').value;
     const endTime = document.getElementById('endTime').value;
+    const adminMode = document.getElementById('adminMode')?.checked || false;
 
-    if (!currentEmployee) {
-        showMessage('Please select an employee first!', 'error');
+    if (!selectedEmployee) {
+        showMessage('Please select an employee!', 'error');
         return;
     }
 
@@ -531,208 +614,295 @@ function submitTimeEntry() {
         return;
     }
 
-    // Create record
-    const record = {
-        id: Date.now(),
-        employee: currentEmployee,
-        date: dateInput,
-        startTime: startTime,
-        endTime: endTime,
-        hours: Math.round(hoursWorked * 100) / 100
-    };
-
     // Show loading
-    document.getElementById('submitBtn').disabled = true;
-    document.getElementById('submitBtn').textContent = '⏳ Submitting...';
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Submitting...';
 
-    // Send to Google Sheets
-    sendToGoogleSheets(record)
-        .then(() => {
-            // Add to local storage as backup
+    // Prepare form data
+    const formData = new FormData();
+    formData.append('employee', selectedEmployee);
+    formData.append('date', dateInput);
+    formData.append('startTime', startTime);
+    formData.append('endTime', endTime);
+    formData.append('hours', Math.round(hoursWorked * 100) / 100);
+    formData.append('timestamp', new Date().toISOString());
+    formData.append('isAdminOverride', adminMode.toString());
+
+    try {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            // Create local record for display
+            const record = {
+                id: Date.now(),
+                employee: selectedEmployee,
+                date: dateInput,
+                startTime: startTime,
+                endTime: endTime,
+                hours: Math.round(hoursWorked * 100) / 100
+            };
+            
+            // Add to local storage for display purposes
             timeRecords.push(record);
             localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
 
-            // Show success
-            showMessage(`✅ Work hours submitted successfully! Total: ${record.hours.toFixed(1)} hours`, 'success');
+            // Show success message
+            const successMsg = adminMode ? 
+                `✅ Time entry for ${selectedEmployee} submitted successfully! Total: ${record.hours.toFixed(1)} hours` :
+                `✅ Your work hours submitted successfully! Total: ${record.hours.toFixed(1)} hours`;
             
-            // Clear inputs, but not the date
+            showMessage(successMsg, 'success');
+            
+            // Clear time inputs but keep date and employee
             document.getElementById('startTime').value = '';
             document.getElementById('endTime').value = '';
             
             // Update displays
             updateRecordsList();
             updateMonthlyTotal();
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showMessage('❌ Failed to submit to Google Sheets. Please try again.', 'error');
-        })
-        .finally(() => {
-            // Reset button
-            document.getElementById('submitBtn').disabled = false;
-            document.getElementById('submitBtn').textContent = '✅ Submit Work Hours';
-        });
+            
+        } else {
+            throw new Error(result.message);
+        }
+        
+    } catch (error) {
+        console.error('Submission error:', error);
+        showMessage(`❌ Error: ${error.message}`, 'error');
+    } finally {
+        // Reset button
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✅ Submit Work Hours';
+    }
 }
-        // Send data to Google Sheets
-        function sendToGoogleSheets(record) {
-            const formData = new FormData();
-            formData.append('employee', record.employee);
-            formData.append('date', record.date);
-            formData.append('startTime', record.startTime);
-            formData.append('endTime', record.endTime);
-            formData.append('hours', record.hours);
-            formData.append('timestamp', new Date().toISOString());
 
-            return fetch(GOOGLE_SCRIPT_URL, {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.text();
-            });
+// Show unauthorized access message
+function showUnauthorizedMessage(email) {
+    document.querySelector('.content').innerHTML = `
+        <div style="text-align: center; padding: 40px 20px;">
+            <div style="font-size: 60px; margin-bottom: 20px;">🚫</div>
+            <h2 style="color: #dc3545; margin-bottom: 15px;">Access Denied</h2>
+            <p style="color: #666; margin-bottom: 20px;">
+                Your email address <strong>${email}</strong> is not authorized to use this system.
+            </p>
+            <p style="color: #666; margin-bottom: 30px;">
+                Please contact your administrator to request access.
+            </p>
+            <button onclick="location.reload()" style="background: #007bff; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer;">
+                🔄 Try Again
+            </button>
+        </div>
+    `;
+}
+
+// Show inactive account message
+function showInactiveMessage() {
+    document.querySelector('.content').innerHTML = `
+        <div style="text-align: center; padding: 40px 20px;">
+            <div style="font-size: 60px; margin-bottom: 20px;">⏸️</div>
+            <h2 style="color: #ffc107; margin-bottom: 15px;">Account Inactive</h2>
+            <p style="color: #666; margin-bottom: 20px;">
+                Your account has been deactivated and you can no longer submit time entries.
+            </p>
+            <p style="color: #666; margin-bottom: 30px;">
+                If you believe this is an error, please contact your administrator.
+            </p>
+        </div>
+    `;
+}
+
+// Enhanced show message function
+function showMessage(message, type) {
+    const statusEl = document.getElementById('statusMessage');
+    statusEl.textContent = message;
+    statusEl.className = `status-message ${type}`;
+    statusEl.style.display = 'block';
+    
+    // Add info type styling
+    if (type === 'info') {
+        statusEl.style.background = '#cce7ff';
+        statusEl.style.color = '#004085';
+        statusEl.style.border = '1px solid #b3d7ff';
+    }
+    
+    if (type === 'success') {
+        setTimeout(() => {
+            statusEl.style.display = 'none';
+        }, 5000);
+    }
+}
+
+// Employee selection handler
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('employee').addEventListener('change', function() {
+        const selectedEmployee = this.value;
+        if (selectedEmployee) {
+            updateRecordsList(selectedEmployee);
+            updateMonthlyTotal(selectedEmployee);
+            document.getElementById('submitBtn').disabled = false;
+        } else {
+            resetView();
+            document.getElementById('submitBtn').disabled = true;
         }
+    });
+});
 
-        // Show status message
-        function showMessage(message, type) {
-            const statusEl = document.getElementById('statusMessage');
-            statusEl.textContent = message;
-            statusEl.className = `status-message ${type}`;
-            
-            if (type === 'success') {
-                setTimeout(() => {
-                    statusEl.style.display = 'none';
-                }, 5000);
-            }
-        }
+// Update current time display
+function updateCurrentTime() {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('de-DE', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    const dateStr = now.toLocaleDateString('de-DE', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+    
+    document.getElementById('currentTime').textContent = timeStr;
+    document.getElementById('currentDate').textContent = dateStr;
+}
 
-        // Reset view
-        function resetView() {
-            document.getElementById('recordsList').innerHTML = '<div class="no-records">Select an employee to view work records</div>';
-            document.getElementById('monthlyTotal').style.display = 'none';
-            document.getElementById('statusMessage').style.display = 'none';
-        }
+// Set current time to input field
+function setCurrentTime(inputId) {
+    const now = new Date();
+    const timeStr = now.toTimeString().slice(0, 5);
+    document.getElementById(inputId).value = timeStr;
+}
 
-        // Update records list
-        function updateRecordsList() {
-            const recordsList = document.getElementById('recordsList');
-            const employeeRecords = timeRecords
-                .filter(r => r.employee === currentEmployee)
-                .sort((a, b) => new Date(b.date) - new Date(a.date))
-                .slice(0, 15); // Show last 15 records
-            
-            if (employeeRecords.length === 0) {
-                recordsList.innerHTML = '<div class="no-records">No work records found for this employee.</div>';
-                return;
-            }
-            
-            recordsList.innerHTML = employeeRecords.map(record => {
-                const date = new Date(record.date).toLocaleDateString('de-DE', {
-                    weekday: 'short',
-                    day: '2-digit',
-                    month: '2-digit'
-                });
-                
-                return `
-                    <div class="record-item">
-                        <div>
-                            <div class="record-date">${date}</div>
-                            <div class="record-times">
-                                🕐 ${record.startTime} - 🕕 ${record.endTime}
-                            </div>
-                        </div>
-                        <div class="record-hours">${record.hours.toFixed(1)}h</div>
+// Reset view
+function resetView() {
+    document.getElementById('recordsList').innerHTML = '<div class="no-records">Select an employee to view work records</div>';
+    document.getElementById('monthlyTotal').style.display = 'none';
+}
+
+// Update records list for selected employee
+function updateRecordsList(employeeName = null) {
+    const targetEmployee = employeeName || document.getElementById('employee').value;
+    const recordsList = document.getElementById('recordsList');
+    
+    const employeeRecords = timeRecords
+        .filter(r => r.employee === targetEmployee)
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .slice(0, 15); // Show last 15 records
+    
+    if (employeeRecords.length === 0) {
+        recordsList.innerHTML = '<div class="no-records">No work records found for this employee.</div>';
+        return;
+    }
+    
+    recordsList.innerHTML = employeeRecords.map(record => {
+        const date = new Date(record.date).toLocaleDateString('de-DE', {
+            weekday: 'short',
+            day: '2-digit',
+            month: '2-digit'
+        });
+        
+        return `
+            <div class="record-item">
+                <div>
+                    <div class="record-date">${date}</div>
+                    <div class="record-times">
+                        🕐 ${record.startTime} - 🕕 ${record.endTime}
                     </div>
-                `;
-            }).join('');
-        }
+                </div>
+                <div class="record-hours">${record.hours.toFixed(1)}h</div>
+            </div>
+        `;
+    }).join('');
+}
 
-        // Update monthly total
-        function updateMonthlyTotal() {
-            const currentMonth = new Date().getMonth();
-            const currentYear = new Date().getFullYear();
-            
-            const monthlyRecords = timeRecords.filter(r => 
-                r.employee === currentEmployee &&
-                new Date(r.date).getMonth() === currentMonth &&
-                new Date(r.date).getFullYear() === currentYear
-            );
-            
-            const totalHours = monthlyRecords.reduce((sum, record) => sum + record.hours, 0);
-            
-            if (totalHours > 0) {
-                document.getElementById('monthlyTotal').style.display = 'block';
-                document.getElementById('totalHours').textContent = `${totalHours.toFixed(1)} hours`;
-            } else {
-                document.getElementById('monthlyTotal').style.display = 'none';
-            }
-        }
+// Update monthly total for selected employee
+function updateMonthlyTotal(employeeName = null) {
+    const targetEmployee = employeeName || document.getElementById('employee').value;
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    
+    const monthlyRecords = timeRecords.filter(r => 
+        r.employee === targetEmployee &&
+        new Date(r.date).getMonth() === currentMonth &&
+        new Date(r.date).getFullYear() === currentYear
+    );
+    
+    const totalHours = monthlyRecords.reduce((sum, record) => sum + record.hours, 0);
+    
+    if (totalHours > 0) {
+        document.getElementById('monthlyTotal').style.display = 'block';
+        document.getElementById('totalHours').textContent = `${totalHours.toFixed(1)} hours`;
+    } else {
+        document.getElementById('monthlyTotal').style.display = 'none';
+    }
+}
 
-        // Download report
-        function downloadReport() {
-            if (!currentEmployee) {
-                showMessage('Please select an employee first!', 'error');
-                return;
-            }
-            
-            const employeeRecords = timeRecords.filter(r => r.employee === currentEmployee);
-            
-            if (employeeRecords.length === 0) {
-                showMessage('No records found for this employee!', 'error');
-                return;
-            }
-            
-            // Create CSV content
-            let csvContent = "Date,Start Time,End Time,Hours Worked\n";
-            employeeRecords.forEach(record => {
-                const date = new Date(record.date).toLocaleDateString('de-DE');
-                csvContent += `${date},${record.startTime},${record.endTime},${record.hours}\n`;
-            });
-            
-            // Download file
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${currentEmployee}_BackWerk_timesheet.csv`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-            
-            showMessage('📥 Report downloaded successfully!', 'success');
-        }
+// Download report (enhanced for admin)
+function downloadReport() {
+    const selectedEmployee = document.getElementById('employee').value;
+    
+    if (!selectedEmployee) {
+        showMessage('Please select an employee first!', 'error');
+        return;
+    }
+    
+    const employeeRecords = timeRecords.filter(r => r.employee === selectedEmployee);
+    
+    if (employeeRecords.length === 0) {
+        showMessage('No records found for this employee!', 'error');
+        return;
+    }
+    
+    // Create CSV content
+    let csvContent = "Date,Start Time,End Time,Hours Worked\n";
+    employeeRecords.forEach(record => {
+        const date = new Date(record.date).toLocaleDateString('de-DE');
+        csvContent += `${date},${record.startTime},${record.endTime},${record.hours}\n`;
+    });
+    
+    // Download file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedEmployee}_BackWerk_timesheet.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    showMessage('📥 Report downloaded successfully!', 'success');
+}
 
-        // Clear local records
-        function clearRecords() {
-            if (!currentEmployee) {
-                showMessage('Please select an employee first!', 'error');
-                return;
-            }
-            
-            if (confirm(`Are you sure you want to clear all LOCAL records for ${currentEmployee}? This will NOT affect Google Sheets data.`)) {
-                timeRecords = timeRecords.filter(r => r.employee !== currentEmployee);
-                localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
-                updateRecordsList();
-                updateMonthlyTotal();
-                showMessage('🗑️ Local records cleared successfully!', 'success');
-            }
-        }
+// Clear local records (enhanced)
+function clearRecords() {
+    const selectedEmployee = document.getElementById('employee').value;
+    
+    if (!selectedEmployee) {
+        showMessage('Please select an employee first!', 'error');
+        return;
+    }
+    
+    const confirmText = isAdmin ? 
+        `Clear all LOCAL records for ${selectedEmployee}? This will NOT affect Google Sheets data.` :
+        `Clear all YOUR LOCAL records? This will NOT affect Google Sheets data.`;
+    
+    if (confirm(confirmText)) {
+        timeRecords = timeRecords.filter(r => r.employee !== selectedEmployee);
+        localStorage.setItem('backwerkTimeRecords', JSON.stringify(timeRecords));
+        updateRecordsList();
+        updateMonthlyTotal();
+        showMessage('🗑️ Local records cleared successfully!', 'success');
+    }
+}
 
-        // Open Google Sheet
-        function openGoogleSheet() {
-            window.open(GOOGLE_SHEET_URL, '_blank');
-        }
-
-        // Initialize the app
-        updateCurrentTime();
-        setInterval(updateCurrentTime, 1000);
-        document.getElementById('submitBtn').disabled = true;
-
-        // Check if Google Script URL is configured
-        if (GOOGLE_SCRIPT_URL.includes('YOUR_DEPLOYMENT_ID')) {
-            showMessage('⚠️ Please configure your Google Apps Script URL in the code!', 'error');
-        }
+// Open Google Sheet
+function openGoogleSheet() {
+    window.open(GOOGLE_SHEET_URL, '_blank');
+}
     </script>
 </body>
 </html>
